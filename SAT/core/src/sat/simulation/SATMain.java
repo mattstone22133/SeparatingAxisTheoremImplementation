@@ -1,27 +1,36 @@
 package sat.simulation;
 
-import java.util.Arrays;
-
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.g2d.PolygonSpriteBatch;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.Polygon;
 
 public class SATMain extends ApplicationAdapter
 {
 	private ShapeRenderer shapeRenderer;
+	private BitmapFont bmFont;
+	private SpriteBatch batch;
 	private Polygon square;
 	private Polygon triangle;
-	private float translationSpeed = 10f;
-	private float rotationSpeed = 10f;
+	private float translationSpeed = 5f;
+	private float rotationSpeed = 5f;
+	private boolean collisionLibraryDetected;
+	private boolean collisionSATDetected;
 
 	@Override
 	public void create()
 	{
 		shapeRenderer = new ShapeRenderer();
+		bmFont = new BitmapFont();
+		bmFont.setColor(Color.WHITE);
+		batch = new SpriteBatch();
+
 		//square @formatter:off
 		float[] squareVerts = new float[] { 
 			5f, 5f,
@@ -52,12 +61,14 @@ public class SATMain extends ApplicationAdapter
 
 		// position
 		triangle.setPosition(Gdx.graphics.getWidth() / 2, Gdx.graphics.getHeight() / 2);
+		square.setPosition(250f, 250f);
 	}
 
 	@Override
 	public void render()
 	{
-		keyboard_io();
+		keyboard_IO();
+		calculateCollisions();
 
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -67,9 +78,40 @@ public class SATMain extends ApplicationAdapter
 		shapeRenderer.polygon(square.getTransformedVertices());
 		shapeRenderer.polygon(triangle.getTransformedVertices());
 		shapeRenderer.end();
+
+		renderText();
 	}
 
-	private void keyboard_io()
+	private void renderText()
+	{
+		batch.begin();
+		if (collisionLibraryDetected)
+		{
+			bmFont.draw(batch, "Library detected collision", 10f, 0 + 2 * bmFont.getCapHeight());
+		}
+		else if (collisionSATDetected)
+		{
+			bmFont.draw(batch, "SAT detected collision", Gdx.graphics.getWidth() / 2 - 10f, 0 + 2 * bmFont.getCapHeight());
+		}
+		else
+		{
+			bmFont.draw(batch, "No detected collisions", Gdx.graphics.getWidth() / 2 
+					- bmFont.getSpaceWidth() * "No detected collisions".length() //approximately center this text
+					,0 + 2 * bmFont.getCapHeight());
+		}
+		batch.end();		
+	}
+
+	private void calculateCollisions()
+	{
+		// check collision via library methods
+		collisionLibraryDetected = Intersector.overlapConvexPolygons(square, triangle);
+
+		// check collision via SAT implementation
+		collisionSATDetected = SAT.PolygonCollide_2D_v1(square.getTransformedVertices(), triangle.getTransformedVertices());
+	}
+
+	private void keyboard_IO()
 	{
 		if (Gdx.input.isKeyPressed(Input.Keys.CONTROL_LEFT) || Gdx.input.isKeyPressed(Input.Keys.CONTROL_RIGHT))
 		{
@@ -147,8 +189,8 @@ public class SATMain extends ApplicationAdapter
 				triangle.translate(0, -translationSpeed);
 			}
 		}
-		
-		if(Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
+
+		if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
 		{
 			Gdx.app.exit();
 		}
@@ -158,5 +200,7 @@ public class SATMain extends ApplicationAdapter
 	public void dispose()
 	{
 		shapeRenderer.dispose();
+		bmFont.dispose();
+		batch.dispose();
 	}
 }
