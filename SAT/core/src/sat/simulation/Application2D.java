@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.Polygon;
 
@@ -67,14 +68,15 @@ public class Application2D extends ApplicationAdapter
 	@Override
 	public void render()
 	{
-		keyboard_IO();
-		calculateCollisions();
 
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		shapeRenderer.setAutoShapeType(true);
-		shapeRenderer.begin();
+		keyboard_IO();
+		calculateCollisions();
+		
+		shapeRenderer.setAutoShapeType(false);
+		shapeRenderer.begin(ShapeType.Line);
 		shapeRenderer.polygon(square.getTransformedVertices());
 		shapeRenderer.polygon(triangle.getTransformedVertices());
 		shapeRenderer.end();
@@ -108,7 +110,7 @@ public class Application2D extends ApplicationAdapter
 		collisionLibraryDetected = Intersector.overlapConvexPolygons(square, triangle);
 
 		// check collision via SAT implementation
-		collisionSATDetected = SAT.PolygonCollide_2D_v1(square.getTransformedVertices(), triangle.getTransformedVertices());
+		collisionSATDetected = SAT.PolygonCollide_2D_v1(shapeRenderer, square.getTransformedVertices(), triangle.getTransformedVertices());
 	}
 
 	private void keyboard_IO()
