@@ -3,9 +3,10 @@ package sat.simulation;
 import java.util.ArrayList;
 import java.util.Stack;
 
-import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
+import com.badlogic.gdx.math.Vector2;
 
 /**
  * Class responsible for Separating Axis Theorem calculations.
@@ -28,13 +29,13 @@ public class SAT
 	 * SAT on 2D polygon. Assumes two sets of vertices can be used to provide a line segment surface
 	 * from which a normal vector can be determined.
 	 * 
-	 * @param startedShapeRenderer
+	 * @param renderInfo
 	 * 
 	 * @param obj1Vertices
 	 * @param obj2Vertices
 	 * @return
 	 */
-	public static boolean PolygonCollide_2D_v1(ShapeRenderer startedShapeRenderer, float[] obj1Vertices, float[] obj2Vertices)
+	public static boolean PolygonCollide_2D_v1(RenderInformation2D renderInfo, float[] obj1Vertices, float[] obj2Vertices)
 	{
 		// determine normal vectors, these will be the axes
 		segmentize(obj1Vertices, obj1Vectors);
@@ -42,10 +43,10 @@ public class SAT
 		convertSegmentsToNormals(obj1Vectors);
 		convertSegmentsToNormals(obj2Vectors);
 
-		if(startedShapeRenderer != null)
+		if(renderInfo != null)
 		{
-			renderAxes(startedShapeRenderer, obj1Vectors, Gdx.graphics.getWidth() * 0.33f);
-			renderAxes(startedShapeRenderer, obj2Vectors, Gdx.graphics.getWidth() * 0.66f);
+			renderAxes(renderInfo, obj1Vectors, 0.01f, 0.001f, renderInfo.axisColorObj1);
+			renderAxes(renderInfo, obj2Vectors, 0, 0, renderInfo.axisColorObj2);
 		}
 		
 		// project min / max vertices on axes
@@ -54,11 +55,11 @@ public class SAT
 		{
 			// test whether projections overlap. 
 			// if there is a non-overlapping projection, there cannot be a collision. 
-			nonCollisionFound |= !projectionOverlap(obj1Vertices, obj2Vertices, axis);
+			nonCollisionFound |= !projectionOverlap(obj1Vertices, obj2Vertices, axis, renderInfo);
 		}
 		for(Segment2D axis : obj2Vectors)
 		{
-			nonCollisionFound |= !projectionOverlap(obj1Vertices, obj2Vertices, axis);
+			nonCollisionFound |= !projectionOverlap(obj1Vertices, obj2Vertices, axis, renderInfo);
 		}
 		
 		// clean up resources
@@ -67,23 +68,26 @@ public class SAT
 		return !nonCollisionFound;
 	}
 
-	private static void renderAxes(ShapeRenderer startedShapeRenderer, ArrayList<Segment2D> normals, float offset)
+	private static void renderAxes(RenderInformation2D renderInfo, ArrayList<Segment2D> normals, float offsetX, float offsetY, Color axisColor)
 	{
 		//float offset = Gdx.graphics.getWidth() / 2;
 		float scale = 100;
 		
-		startedShapeRenderer.begin(ShapeType.Line);
-		startedShapeRenderer.setColor(1, 1, 1, 1);
+		ShapeRenderer sRenderer = renderInfo.shapeRenderer;
+		
+		sRenderer.begin(ShapeType.Line);
+		sRenderer.setColor(axisColor);
 		
 		for(Segment2D segment : normals)
 		{
 			Segment2D axis = segment;
-			startedShapeRenderer.line(-scale * axis.firstVertX  + offset,
-					-scale * axis.secondVertY + offset, 
-					scale * axis.firstVertX + offset,
-					scale * axis.secondVertY + offset);
+			sRenderer.line(-scale * axis.firstVertX  + offsetX,
+					-scale * axis.secondVertY + offsetY, 
+					scale * axis.firstVertX + offsetX,
+					scale * axis.secondVertY + offsetY);
 		}
-		startedShapeRenderer.end();
+		sRenderer.end();
+		sRenderer.setColor(renderInfo.defaultColor);
 	}
 
 	/**
@@ -163,7 +167,7 @@ public class SAT
 	}
 	
 	
-	private static boolean projectionOverlap(float[] obj1Vertices, float[] obj2Vertices, Segment2D axis)
+	private static boolean projectionOverlap(float[] obj1Vertices, float[] obj2Vertices, Segment2D axis, RenderInformation2D rendInfo)
 	{
 		float obj1Min = Float.POSITIVE_INFINITY, obj2Min = Float.POSITIVE_INFINITY;
 		float obj1Max = Float.NEGATIVE_INFINITY, obj2Max = Float.NEGATIVE_INFINITY;
@@ -171,7 +175,6 @@ public class SAT
 		float vDotV = dot2D(axis.firstVertX, axis.firstVertY, axis.firstVertX, axis.firstVertY);
 		for(int i = 0; i < obj1Vertices.length; i += 2)
 		{
-			float projX = 0, projY = 0;
 			
 			//line can be interpreted as C*(vector_on_line).
 			//the projection on the line/axis, can be said to be a specific value of C*vector.
@@ -186,8 +189,10 @@ public class SAT
 			//(projectedVect DOT V) = -(c*V DOT V)
 			//(projectedVect DOT V) / (V DOT V) = C
 			float C = dot2D(obj1Vertices[i], obj1Vertices[i+1], axis.firstVertX, axis.firstVertY) / vDotV;
-			projX = C * axis.firstVertX;
-			projY = C * axis.secondVertY;
+			
+			//float projX = 0, projY = 0;
+			//projX = C * axis.firstVertX;
+			//projY = C * axis.secondVertY;
 			
 			//float projMagnitude = (float) Math.sqrt(Math.pow(projX, 2) + Math.pow(projY, 2)); I think we can just compare C to determine min/max of project
 			if(C < obj1Min)
@@ -199,13 +204,64 @@ public class SAT
 				obj1Max = C;
 			}
 		}
-		for(int i = 0; i < obj2Vertices.length; ++i)
+		for(int i = 0; i < obj2Vertices.length; i += 2)
 		{
+			float C = dot2D(obj2Vertices[i], obj2Vertices[i+1], axis.firstVertX, axis.firstVertY) / vDotV;
+			//float projX = 0, projY = 0;
+			//projX = C * axis.firstVertX;
+			//projY = C * axis.secondVertY;
 			
+			//float projMagnitude = (float) Math.sqrt(Math.pow(projX, 2) + Math.pow(projY, 2)); I think we can just compare C to determine min/max of project
+			if(C < obj2Min)
+			{
+				obj2Min = C;
+			}
+			if(C > obj2Max)
+			{
+				obj2Max = C;
+			}
 		}
-		return false;
+		
+		if(rendInfo != null)
+			renderProjections(rendInfo, axis, obj1Min, obj1Max, obj2Min, obj2Max);
+		
+		//@formatter:off
+		return (obj1Max > obj2Min && obj1Min < obj2Min) // overlap at obj1max and obj2min
+				|| (obj2Max > obj1Min && obj2Min < obj1Min) // overlap at obj2max and obj1min
+				|| (obj1Max > obj2Max && obj2Min > obj1Min) // 1 contains 2
+				|| (obj2Max > obj1Max && obj1Min > obj2Min) // 2 contains 1
+				;
+		//@formatter:on
 	}
 
+
+	private static void renderProjections(RenderInformation2D rendInfo, Segment2D axis, float obj1Min, float obj1Max, float obj2Min, float obj2Max)
+	{
+		ShapeRenderer sr = rendInfo.shapeRenderer;
+		
+		float obj1MaxX = obj1Max * axis.firstVertX; 
+		float obj1MinX = obj1Min * axis.firstVertX;
+		float obj1MaxY = obj1Max * axis.firstVertY;
+		float obj1MinY = obj1Min * axis.firstVertY;
+		
+		sr.begin(ShapeType.Line);
+		sr.setColor(rendInfo.obj1Color);
+		sr.line(obj1MinX, obj1MinY, obj1MaxX, obj1MaxY);
+		sr.setColor(rendInfo.defaultColor);
+		sr.end();
+		
+		float obj2MaxX = obj2Max * axis.firstVertX; 
+		float obj2MinX = obj2Min * axis.firstVertX;
+		float obj2MaxY = obj2Max * axis.firstVertY;
+		float obj2MinY = obj2Min * axis.firstVertY;
+		
+		sr.begin(ShapeType.Line);
+		sr.setColor(rendInfo.obj2Color);
+		sr.line(obj2MinX, obj2MinY, obj2MaxX, obj2MaxY);
+		sr.setColor(rendInfo.defaultColor);
+		sr.end();
+		
+	}
 
 	/**
 	 * Returns all used segments to the static scope global recycled container. Clears out the array
@@ -259,13 +315,13 @@ public class SAT
 		}
 	}
 
-	/**
-	 * A simple struct that represents a 2D segment defined by a start and end point.
-	 * 
-	 * @author Matt Stone
-	 *
-	 */
-	protected static class Segment2D
+	public static float dot2D(float x1, float y1, float x2, float y2)
+	{
+		return x1 * x2 + y1 * y2;
+	}
+	
+	/* ------------------------------- HELPER CLASSES ----------------------------- */
+	public static class Segment2D
 	{
 		public float firstVertX = 0;
 		public float firstVertY = 0;
@@ -273,8 +329,25 @@ public class SAT
 		public float secondVertY = 0;
 	}
 	
-	public static float dot2D(float x1, float y1, float x2, float y2)
+	/**
+	 * Structure that contains all information needed for debug rendering. 
+	 * @author matt 
+	 */
+	public static class RenderInformation2D
 	{
-		
+		public RenderInformation2D(ShapeRenderer sr)
+		{
+			this.shapeRenderer = sr;
+			obj1Center = new Vector2();
+			obj2Center = new Vector2();
+		}
+		public ShapeRenderer shapeRenderer;
+		public Vector2 obj1Center;
+		public Vector2 obj2Center;
+		public Color defaultColor = new Color(Color.WHITE);
+		public Color obj1Color = new Color(Color.GREEN);
+		public Color obj2Color = new Color(Color.BLUE);
+		public Color axisColorObj1 = new Color(209/255f, 255/255f, 198/255f, 1f);
+		public Color axisColorObj2 = new Color(Color.SKY);
 	}
 }
