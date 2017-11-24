@@ -101,7 +101,7 @@ public class Application2D extends ApplicationAdapter
 		{
 			bmFont.draw(batch, "Library detected collision", 10f, 0 + 2 * bmFont.getCapHeight());
 		}
-		else if (collisionSATDetected)
+		if (collisionSATDetected)
 		{
 			bmFont.draw(batch, "SAT detected collision", Gdx.graphics.getWidth() / 2 - 10f, 0 + 2 * bmFont.getCapHeight());
 		}
