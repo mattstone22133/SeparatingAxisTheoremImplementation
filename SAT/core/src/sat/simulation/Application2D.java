@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 import com.badlogic.gdx.math.Intersector;
 import com.badlogic.gdx.math.Polygon;
+import com.badlogic.gdx.math.Vector2;
 
 public class Application2D extends ApplicationAdapter
 {
@@ -26,6 +27,8 @@ public class Application2D extends ApplicationAdapter
 	private boolean collisionLibraryDetected;
 	private boolean collisionSATDetected;
 	private SAT.RenderInformation2D renderInfo;
+	private boolean useMTV = false;
+	private Vector2 mtv = new Vector2();
 
 	@Override
 	public void create()
@@ -90,7 +93,6 @@ public class Application2D extends ApplicationAdapter
 		shapeRenderer.setColor(renderInfo.defaultColor);
 		shapeRenderer.end();
 		
-
 		renderText();
 	}
 
@@ -111,6 +113,11 @@ public class Application2D extends ApplicationAdapter
 					- bmFont.getSpaceWidth() * "No detected collisions".length() //approximately center this text
 					,0 + 2 * bmFont.getCapHeight());
 		}
+		if(useMTV)
+		{
+			bmFont.draw(batch, "MTV enabled", Gdx.graphics.getWidth() * 0.45f, Gdx.graphics.getHeight() * 0.80f);
+		}
+		
 		batch.end();		
 	}
 
@@ -122,7 +129,19 @@ public class Application2D extends ApplicationAdapter
 		// check collision via SAT implementation
 		renderInfo.obj1Center.set(square.getX() + 6, square.getY() + 4);
 		renderInfo.obj2Center.set(triangle.getX() + 55, triangle.getY() + 45);
-		collisionSATDetected = SAT.PolygonCollide_2D_v1(renderInfo, square.getTransformedVertices(), triangle.getTransformedVertices());
+		
+		if(!useMTV)
+		{
+			collisionSATDetected = SAT.PolygonCollide_2D_v1(renderInfo, square.getTransformedVertices(), triangle.getTransformedVertices());
+		}
+		else
+		{
+			collisionSATDetected = SAT.PolygonCollide_2D_mtv(renderInfo, square.getTransformedVertices(), triangle.getTransformedVertices(), mtv);
+			if(collisionSATDetected)
+			{
+				square.translate(mtv.x, mtv.y);
+			}
+		}
 	}
 
 	private void keyboard_IO()
@@ -207,6 +226,10 @@ public class Application2D extends ApplicationAdapter
 		if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))
 		{
 			Gdx.app.exit();
+		}
+		if (Gdx.input.isKeyJustPressed(Input.Keys.M))
+		{
+			useMTV = !useMTV;
 		}
 	}
 

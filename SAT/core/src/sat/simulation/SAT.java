@@ -1,5 +1,6 @@
 package sat.simulation;
 
+import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.Stack;
 
@@ -73,7 +74,7 @@ public class SAT
 		cleanUpRecycledResources();
 		return collision;
 	}
-
+	
 	private static void renderAxes(RenderInformation2D renderInfo, ArrayList<Segment2D> normals, float offsetX, float offsetY, Color axisColor)
 	{
 		// float offset = Gdx.graphics.getWidth() / 2;
@@ -237,6 +238,8 @@ public class SAT
 		if (rendInfo != null) renderProjections(rendInfo, axis, obj1Min, obj1Max, obj2Min, obj2Max);
 
 		//@formatter:off
+		//Imagine the objMin/Max ranges as being segments on a the X-axis.
+		//in reality, they represent scalars to multiply against the true axis. 
 		return (obj1Max >= obj2Min && obj1Min <= obj2Min) // overlap at obj1max and obj2min
 				|| (obj2Max >= obj1Min && obj2Min <= obj1Min) // overlap at obj2max and obj1min
 				|| (obj1Max >= obj2Max && obj2Min >= obj1Min) // 1 contains 2
@@ -244,6 +247,205 @@ public class SAT
 				;
 		//@formatter:on
 	}
+	
+	public static Vector2 tempBuffer = new Vector2();
+	public static boolean PolygonCollide_2D_mtv(RenderInformation2D renderInfo, float[] obj1Vertices, float[] obj2Vertices, Vector2 mtvBuffer)
+	{
+		// determine normal vectors, these will be the axes
+		segmentize(obj1Vertices, obj1Vectors);
+		segmentize(obj2Vertices, obj2Vectors);
+		convertSegmentsToNormals(obj1Vectors);
+		convertSegmentsToNormals(obj2Vectors);
+
+		if (renderInfo != null)
+		{
+			renderAxes(renderInfo, obj1Vectors, 0.01f, 0.001f, renderInfo.axisColorObj1);
+			renderAxes(renderInfo, obj2Vectors, 0, 0, renderInfo.axisColorObj2);
+		}
+
+		mtvBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
+		//tempBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
+		float mtvLength = Float.POSITIVE_INFINITY;
+		
+		// project min / max vertices on axes
+		// NOTE: boolean redundant checks because this method draws the projections, must check
+		// every projection to draw it.
+		boolean collision = true;
+		for (Segment2D axis : obj1Vectors)
+		{
+			// test whether projections overlap.
+			// if there is a non-overlapping projection, there cannot be a collision.
+			collision &= projectionOverlap_MTV(obj1Vertices, obj2Vertices, axis, renderInfo, tempBuffer);
+			float magnitudeOfBuffer = vect1IsMinimumMagnitude(tempBuffer, mtvBuffer);
+			//zero signals the new translation vector is not smaller than last. 
+			if(magnitudeOfBuffer != 0)
+			{
+				mtvBuffer.set(tempBuffer);
+			}
+		}
+		for (Segment2D axis : obj2Vectors)
+		{
+			collision &= projectionOverlap_MTV(obj1Vertices, obj2Vertices, axis, renderInfo, tempBuffer);
+			float magnitudeOfBuffer = vect1IsMinimumMagnitude(tempBuffer, mtvBuffer);
+			if(magnitudeOfBuffer != 0)
+			{
+				mtvBuffer.set(tempBuffer);
+			}
+		}
+
+		// clean up resources
+		cleanUpRecycledResources();
+		return collision;
+	}
+	
+	private static float vect1IsMinimumMagnitude(Vector2 vect1, Vector2 vect2)
+	{
+		float pnt1Length = pythagorean(vect1);
+		float pnt2Length = pythagorean(vect2);
+		
+		if(pnt1Length < pnt2Length)
+		{
+			return pnt1Length;
+		}
+		//signals false, use int return types to allow use of non-zero returns to update length.
+		return 0f;
+	}
+
+	private static float pythagorean(Vector2 pnt1)
+	{
+		return (float) Math.sqrt(Math.pow(pnt1.x, 2) + Math.pow(pnt1.y, 2));
+	}
+
+	public static float constantOffset = 0.001f;
+	private static boolean projectionOverlap_MTV(float[] obj1Vertices, float[] obj2Vertices, Segment2D axis, RenderInformation2D rendInfo, Vector2 mtv)
+	{
+		float obj1Min = Float.POSITIVE_INFINITY, obj2Min = Float.POSITIVE_INFINITY;
+		float obj1Max = Float.NEGATIVE_INFINITY, obj2Max = Float.NEGATIVE_INFINITY;
+
+		float vDotV = dot2D(axis.firstVertX, axis.firstVertY, axis.firstVertX, axis.firstVertY);
+		for (int i = 0; i < obj1Vertices.length; i += 2)
+		{
+
+			// line can be interpreted as C*(vector_on_line).
+			// the projection on the line/axis, can be said to be a specific value of C*vector.
+			// A right triangle can be made between the axis vector (which is mult by C) and the
+			// vector we're projecting onto the axis.
+			// The base of the triangle (ie the axis) and the height (ie the base -
+			// projected_vector) are orthogonal to each other, this means their dot is 0.
+			// However, we don't know the height of the triangle. But it can be said to be the
+			// vector difference of the projection vector with the axis vector.
+			// ie projectionVector - axis vector.
+			// We derive the following equation: (projected - c*v) DOT (V) = 0 -- where projected is
+			// the projected vector, c*v is the axis, and v is the vector defining the axis
+			// The following is an algebraic manipulation for solving for C.
+			// (projectedVect -c*v) DOT (V) = 0
+			// (projectedVect DOT V) - (c*V DOT V) = 0
+			// (projectedVect DOT V) = -(c*V DOT V)
+			// (projectedVect DOT V) / (V DOT V) = C
+			float C = dot2D(obj1Vertices[i], obj1Vertices[i + 1], axis.firstVertX, axis.firstVertY) / vDotV;
+
+			// float projX = 0, projY = 0;
+			// projX = C * axis.firstVertX;
+			// projY = C * axis.secondVertY;
+
+			// float projMagnitude = (float) Math.sqrt(Math.pow(projX, 2) + Math.pow(projY, 2)); I
+			// think we can just compare C to determine min/max of project
+			if (C < obj1Min)
+			{
+				obj1Min = C;
+			}
+			if (C > obj1Max)
+			{
+				obj1Max = C;
+			}
+		}
+		for (int i = 0; i < obj2Vertices.length; i += 2)
+		{
+			float C = dot2D(obj2Vertices[i], obj2Vertices[i + 1], axis.firstVertX, axis.firstVertY) / vDotV;
+			// float projX = 0, projY = 0;
+			// projX = C * axis.firstVertX;
+			// projY = C * axis.secondVertY;
+
+			// float projMagnitude = (float) Math.sqrt(Math.pow(projX, 2) + Math.pow(projY, 2)); I
+			// think we can just compare C to determine min/max of project
+			if (C < obj2Min)
+			{
+				obj2Min = C;
+			}
+			if (C > obj2Max)
+			{
+				obj2Max = C;
+			}
+		}
+
+		if (rendInfo != null) renderProjections(rendInfo, axis, obj1Min, obj1Max, obj2Min, obj2Max);
+
+		//@formatter:off
+		//Imagine the objMin/Max ranges as being segments on a the X-axis.
+		//in reality, they represent scalars to multiply against the true axis. 
+		boolean obj1MaxOverlapsObj2Min = obj1Max >= obj2Min && obj1Min <= obj2Min;
+		boolean obj2MaxOverlapsObj1Min = obj2Max >= obj1Min && obj2Min <= obj1Min;
+		boolean obj1ContainsObj2 = obj1Max >= obj2Max && obj2Min >= obj1Min;
+		boolean obj2ContainsObj1 = obj2Max >= obj1Max && obj1Min >= obj2Min;
+		
+		if ((obj1MaxOverlapsObj2Min) // overlap at obj1max and obj2min
+				|| (obj2MaxOverlapsObj1Min) // overlap at obj2max and obj1min
+				|| (obj1ContainsObj2) // 1 contains 2
+				|| (obj2ContainsObj1) // 2 contains 1
+				)
+		{ //@formatter:on
+			//the above assumes obj1 is the moving object.
+			if(mtv != null)
+			{
+				//Correct obj1's position with a translation vector. This will be the vector to remove obj1 from collision
+				//The translation vector to correct collision will be along this axis.
+				//therefore, we need to find a constant to multiply the axis by to find the translation vector. 
+				float C = 1; //this is the constant by which to modify the axis vector
+				if(obj1MaxOverlapsObj2Min)
+				{
+					//need vector to point towards minimum of obj2; as if obj1 bumped into obj1
+					C = obj2Min - obj1Max;
+				}
+				else if (obj2MaxOverlapsObj1Min)
+				{
+					//vector should point point towards obj2 max; as if obj1 "backed" into obj2
+					C = obj2Max - obj1Min;
+				}
+				else //if (obj1ContainsObj2 || obj2ContainsObj1) //turns out logic is the same for both cases. 
+				{
+					//unclear which direction to move obj1 without having a reference from where obj1 is moving.
+					//assume segment vertices that are closest represent direction coming from. 
+					//<with the translation vector that lead to condition, we could find direction to correct with>
+					if(Math.abs(obj1Max - obj2Max) > Math.abs(obj1Min - obj2Min))
+					{
+						//move in direction of max
+						//must move obj1's min passed obj2's max
+						C = obj2Max - obj1Min;
+					}
+					else
+					{
+						//move in direction of min
+						//move obj1's max passed obj2's min
+						C = obj2Min - obj1Max;
+					}
+				}
+				
+				//this gives the vector a slight *nudge*. 
+				//bug occured where there would be 2 MTVs used in 2 iterations. 1 moved the MTV
+				//this is related to using > vs. >= when comparing projections. While doing >
+				//fixes a sudden large move, it doesn't appear as smooth as adding a small nudge.
+				C = C > 0 ? C + constantOffset : C - constantOffset; //branching does have a potential slowdown w/ mispredictions; tradeoff: looks(jittery) vs. speed 
+				
+				//take difference of segments, use difference to determine overlap
+				//use overlap to construct a vector. Vector should affect object 1
+				mtv.y = axis.firstVertY * C;
+				mtv.x = axis.firstVertX * C;
+			}
+			return true;
+		}
+		return false;
+	}
+
 
 	private static void renderProjections(RenderInformation2D rendInfo, Segment2D axis, float obj1Min, float obj1Max, float obj2Min, float obj2Max)
 	{
