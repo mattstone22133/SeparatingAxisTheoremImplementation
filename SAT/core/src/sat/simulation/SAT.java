@@ -1,6 +1,5 @@
 package sat.simulation;
 
-import java.nio.Buffer;
 import java.util.ArrayList;
 import java.util.Stack;
 
