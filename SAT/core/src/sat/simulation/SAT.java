@@ -263,8 +263,6 @@ public class SAT
 		}
 
 		mtvBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
-		//tempBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
-		float mtvLength = Float.POSITIVE_INFINITY;
 		
 		// project min / max vertices on axes
 		// NOTE: boolean redundant checks because this method draws the projections, must check
@@ -335,7 +333,7 @@ public class SAT
 			// vector difference of the projection vector with the axis vector.
 			// ie projectionVector - axis vector.
 			// We derive the following equation: (projected - c*v) DOT (V) = 0 -- where projected is
-			// the projected vector, c*v is the axis, and v is the vector defining the axis
+			// the original vector, c*v is vector projected onto the axis, and v is the vector defining the axis
 			// The following is an algebraic manipulation for solving for C.
 			// (projectedVect -c*v) DOT (V) = 0
 			// (projectedVect DOT V) - (c*V DOT V) = 0

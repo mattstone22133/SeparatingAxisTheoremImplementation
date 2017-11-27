@@ -55,10 +55,9 @@ public class WrappedCubeModel
 /// ----------------------------------------------------------------------------------------------------- //
 	public class CubeInstance
 	{
-		
-		private float cubeWidth;
-		private float cubeHeight;
-		private float cubeDepth;
+		public final float cubeWidth;
+		public final float cubeHeight;
+		public final float cubeDepth;
 		private ModelInstance cube;
 		private Vector3[] vertices;
 		private Vector3[] transformedVertices;
@@ -105,7 +104,7 @@ public class WrappedCubeModel
 			
 		}
 		
-		private Vector3[] getTransformVertices()
+		public Vector3[] getTransformVertices()
 		{
 			for(int i = 0; i < vertices.length; ++i)
 			{

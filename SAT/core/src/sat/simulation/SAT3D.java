@@ -3,10 +3,6 @@ package sat.simulation;
 import java.util.ArrayList;
 import java.util.Stack;
 
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 
 /**
@@ -23,103 +19,93 @@ import com.badlogic.gdx.math.Vector3;
 public class SAT3D
 {
 	private static Stack<Segment3D> recycledSegments = new Stack<Segment3D>();
-	private static ArrayList<Segment3D> obj1Vectors = new ArrayList<Segment3D>();
-	private static ArrayList<Segment3D> obj2Vectors = new ArrayList<Segment3D>();
+	private static ArrayList<Segment3D> cube1Vectors = new ArrayList<Segment3D>();
+	private static ArrayList<Segment3D> cube2Vectors = new ArrayList<Segment3D>();
+	private static ArrayList<Vector3> axes = new ArrayList<Vector3>();
+	public static Vector3 tempBuffer = new Vector3();
 
-	public static Vector2 tempBuffer = new Vector2();
-
-	public static boolean CubeCollide_3D_mtv(RenderInformation2D renderInfo, Vector3[] obj1Vertices, Vector3[] obj2Vertices, Vector2 mtvBuffer)
+	public static boolean CubeCollide_3D_mtv(Vector3[] obj1Vertices, Vector3[] obj2Vertices, Vector3 mtvBuffer)
 	{
 		// determine normal vectors, these will be the axes
-		segmentizeCube(obj1Vertices, obj1Vectors);
-		segmentizeCube(obj2Vertices, obj2Vectors);
-		convertSegmentsToNormals(obj1Vectors);
-		convertSegmentsToNormals(obj2Vectors);
+		segmentizeCube(obj1Vertices, cube1Vectors);
+		segmentizeCube(obj2Vertices, cube2Vectors);
+		
+		convertSegmentsToAxes(cube1Vectors, cube2Vectors, axes);
 
-		if (renderInfo != null)
-		{
-			renderAxes(renderInfo, obj1Vectors, 0.01f, 0.001f, renderInfo.axisColorObj1);
-			renderAxes(renderInfo, obj2Vectors, 0, 0, renderInfo.axisColorObj2);
-		}
-
-		mtvBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
-		// tempBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
-		float mtvLength = Float.POSITIVE_INFINITY;
+		mtvBuffer.set(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY);
 
 		// project min / max vertices on axes
 		// NOTE: boolean redundant checks because this method draws the projections, must check
 		// every projection to draw it.
 		boolean collision = true;
-		for (Segment3D axis : obj1Vectors)
+		for (Vector3 axis : axes)
 		{
 			// test whether projections overlap.
 			// if there is a non-overlapping projection, there cannot be a collision.
-			//collision &= projectionOverlap_MTV(obj1Vertices, obj2Vertices, axis, renderInfo, tempBuffer);
+			collision &= projectionOverlap_MTV(obj1Vertices, obj2Vertices, axis, tempBuffer);
+			
 			float magnitudeOfBuffer = vect1IsMinimumMagnitude(tempBuffer, mtvBuffer);
 			// zero signals the new translation vector is not smaller than last.
 			if (magnitudeOfBuffer != 0)
 			{
 				mtvBuffer.set(tempBuffer);
 			}
-		}
-		for (Segment3D axis : obj2Vectors)
-		{
-			//collision &= projectionOverlap_MTV(obj1Vertices, obj2Vertices, axis, renderInfo, tempBuffer);
-			float magnitudeOfBuffer = vect1IsMinimumMagnitude(tempBuffer, mtvBuffer);
-			if (magnitudeOfBuffer != 0)
+			
+			//early exit if we find we're not coliding
+			if(!collision)
 			{
-				mtvBuffer.set(tempBuffer);
+				mtvBuffer.set(0,0,0);
+				break;
 			}
 		}
-
+		
 		// clean up resources
 		cleanUpRecycledResources();
 		return collision;
 	}
 
-	private static float vect1IsMinimumMagnitude(Vector2 vect1, Vector2 vect2)
+	private static float vect1IsMinimumMagnitude(Vector3 vect1, Vector3 vect2)
 	{
-		float pnt1Length = pythagorean(vect1);
-		float pnt2Length = pythagorean(vect2);
+		float pnt1Length = vect1.len();
+		float pnt2Length = vect2.len();
 
 		if (pnt1Length < pnt2Length) { return pnt1Length; }
 		// signals false, use int return types to allow use of non-zero returns to update length.
 		return 0f;
 	}
 
-	private static float pythagorean(Vector2 pnt1)
-	{
-		return (float) Math.sqrt(Math.pow(pnt1.x, 2) + Math.pow(pnt1.y, 2));
-	}
-
-	public static float constantOffset = 0.001f;
-
-	private static boolean projectionOverlap_MTV(float[] obj1Vertices, float[] obj2Vertices, Segment3D axis, RenderInformation2D rendInfo, Vector2 mtv)
+	private final static float constantOffset = 0.001f;
+	private static boolean projectionOverlap_MTV(Vector3[] obj1Vertices, Vector3[] obj2Vertices, Vector3 vectorOnAxis, Vector3 mtv)
 	{
 		float obj1Min = Float.POSITIVE_INFINITY, obj2Min = Float.POSITIVE_INFINITY;
 		float obj1Max = Float.NEGATIVE_INFINITY, obj2Max = Float.NEGATIVE_INFINITY;
 
-		float vDotV = dot2D(axis.firstVertX, axis.firstVertY, axis.firstVertX, axis.firstVertY);
-		for (int i = 0; i < obj1Vertices.length; i += 2)
+		float vDotV = vectorOnAxis.dot(vectorOnAxis);
+		for(Vector3 vertexObj1 : obj1Vertices)
 		{
 
-			// line can be interpreted as C*(vector_on_line).
-			// the projection on the line/axis, can be said to be a specific value of C*vector.
+			// line/axis can be interpreted as C*(vector_on_line).
+			// the projection on the line/axis, can be said to be a specific value of C multiplied by the vector.
 			// A right triangle can be made between the axis vector (which is mult by C) and the
 			// vector we're projecting onto the axis.
-			// The base of the triangle (ie the axis) and the height (ie the base -
-			// projected_vector) are orthogonal to each other, this means their dot is 0.
+			//
+			// The base of the triangle (ie the axis) and 
+			// the height (ie the base - projected_vector)
+			// are orthogonal to each other, this means their dot is 0.
+			//
 			// However, we don't know the height of the triangle. But it can be said to be the
 			// vector difference of the projection vector with the axis vector.
-			// ie projectionVector - axis vector.
-			// We derive the following equation: (projected - c*v) DOT (V) = 0 -- where projected is
-			// the projected vector, c*v is the axis, and v is the vector defining the axis
+			// ie height vector = projectionVector - axis vector.
+			//
+			// We derive the following equation: (projected_from - c*v) DOT (V) = 0 
+			// -- where projected is the projected vector, c*v is the resulting projection, and v is the vector defining the axis
+			//
 			// The following is an algebraic manipulation for solving for C.
 			// (projectedVect -c*v) DOT (V) = 0
 			// (projectedVect DOT V) - (c*V DOT V) = 0
 			// (projectedVect DOT V) = -(c*V DOT V)
 			// (projectedVect DOT V) / (V DOT V) = C
-			float C = dot2D(obj1Vertices[i], obj1Vertices[i + 1], axis.firstVertX, axis.firstVertY) / vDotV;
+			float C = vertexObj1.dot(vectorOnAxis) / vDotV;
 
 			// float projX = 0, projY = 0;
 			// projX = C * axis.firstVertX;
@@ -136,9 +122,10 @@ public class SAT3D
 				obj1Max = C;
 			}
 		}
-		for (int i = 0; i < obj2Vertices.length; i += 2)
+		//for (int i = 0; i < obj2Vertices.length; i += 2)
+		for(Vector3 vertexObj2 : obj2Vertices)
 		{
-			float C = dot2D(obj2Vertices[i], obj2Vertices[i + 1], axis.firstVertX, axis.firstVertY) / vDotV;
+			float C = vertexObj2.dot(vectorOnAxis) / vDotV;
 			// float projX = 0, projY = 0;
 			// projX = C * axis.firstVertX;
 			// projY = C * axis.secondVertY;
@@ -154,8 +141,6 @@ public class SAT3D
 				obj2Max = C;
 			}
 		}
-
-		if (rendInfo != null) renderProjections(rendInfo, axis, obj1Min, obj1Max, obj2Min, obj2Max);
 
 		//@formatter:off
 		//Imagine the objMin/Max ranges as being segments on a the X-axis.
@@ -223,40 +208,14 @@ public class SAT3D
 
 				// take difference of segments, use difference to determine overlap
 				// use overlap to construct a vector. Vector should affect object 1
-				mtv.y = axis.firstVertY * C;
-				mtv.x = axis.firstVertX * C;
+				mtv.set(vectorOnAxis);
+				mtv.z *= C;
+				mtv.y *= C;
+				mtv.x *= C;
 			}
 			return true;
 		}
 		return false;
-	}
-
-	private static void renderProjections(RenderInformation2D rendInfo, Segment3D axis, float obj1Min, float obj1Max, float obj2Min, float obj2Max)
-	{
-		ShapeRenderer sr = rendInfo.shapeRenderer;
-
-		float obj1MaxX = obj1Max * axis.firstVertX;
-		float obj1MinX = obj1Min * axis.firstVertX;
-		float obj1MaxY = obj1Max * axis.firstVertY;
-		float obj1MinY = obj1Min * axis.firstVertY;
-
-		sr.begin(ShapeType.Line);
-		sr.setColor(rendInfo.obj1Color);
-		sr.line(obj1MinX, obj1MinY, obj1MaxX, obj1MaxY);
-		sr.setColor(rendInfo.defaultColor);
-		sr.end();
-
-		float obj2MaxX = obj2Max * axis.firstVertX;
-		float obj2MinX = obj2Min * axis.firstVertX;
-		float obj2MaxY = obj2Max * axis.firstVertY;
-		float obj2MinY = obj2Min * axis.firstVertY;
-
-		sr.begin(ShapeType.Line);
-		sr.setColor(rendInfo.obj2Color);
-		sr.line(obj2MinX, obj2MinY, obj2MaxX, obj2MaxY);
-		sr.setColor(rendInfo.defaultColor);
-		sr.end();
-
 	}
 
 	/**
@@ -266,16 +225,16 @@ public class SAT3D
 	 */
 	private static void cleanUpRecycledResources()
 	{
-		for (Segment3D segment : obj1Vectors)
+		for (Segment3D segment : cube1Vectors)
 		{
 			recycleSegment(segment);
 		}
-		for (Segment3D segment : obj2Vectors)
+		for (Segment3D segment : cube2Vectors)
 		{
 			recycleSegment(segment);
 		}
-		obj1Vectors.clear();
-		obj2Vectors.clear();
+		cube1Vectors.clear();
+		cube2Vectors.clear();
 	}
 
 	/**
@@ -309,30 +268,6 @@ public class SAT3D
 		{
 			recycledSegments.push(segment);
 		}
-	}
-
-	public static float dot2D(float x1, float y1, float x2, float y2)
-	{
-		return x1 * x2 + y1 * y2;
-	}
-
-	private static void renderAxes(RenderInformation2D renderInfo, ArrayList<Segment3D> normals, float offsetX, float offsetY, Color axisColor)
-	{
-		// float offset = Gdx.graphics.getWidth() / 2;
-		float scale = 100;
-
-		ShapeRenderer sRenderer = renderInfo.shapeRenderer;
-
-		sRenderer.begin(ShapeType.Line);
-		sRenderer.setColor(axisColor);
-
-		for (Segment3D segment : normals)
-		{
-			Segment3D axis = segment;
-			sRenderer.line(-scale * axis.firstVertX + offsetX, -scale * axis.secondVertY + offsetY, scale * axis.firstVertX + offsetX, scale * axis.secondVertY + offsetY);
-		}
-		sRenderer.end();
-		sRenderer.setColor(renderInfo.defaultColor);
 	}
 
 	/**
@@ -403,44 +338,122 @@ public class SAT3D
 	 * vector.
 	 * 
 	 * @param segments
+	 * @param cubeNormals 
 	 */
-	private static void convertSegmentsToNormals(ArrayList<Segment3D> segments)
+	public static Vector3 temp1 = new Vector3();
+	public static Vector3 temp2 = new Vector3();
+	private static void convertSegmentsToAxes(ArrayList<Segment3D> segmentsObj1, ArrayList<Segment3D> segmentsObj2, ArrayList<Vector3> cubeAxes)
 	{
-		for (int i = 0; i < segments.size(); ++i)
+		//REQUIRES FOLLOWING VERTEX MAPPING:
+		//front face: 0, 1, 2, 3
+		//rear face: 4, 5, 6, 7
+		//					   0    1    2    3   4    5     6    7   8    9    10    11
+		//segments should be {0-1}{1-2}{2-3}{3-1}{4-5}{5-6}{6-7}{7-4}{0-4}{1-5}{2-6}{3-7}
+		
+		//note: Segmentation isn't necessary for 3d, but it helps conceptually when designing the algorithm
+		
+		/* Vertex Map
+		 *2----1
+		 *|    |\ 
+		 *3----0 5
+		 * \    \|
+		 *  7----4
+		 */
+		
+		/* Edge map
+		 *  *--1--*
+		 *  |     |\
+		 *  2     0 9
+		 *  |     |  \
+		 *  *--3--*   *
+		 *   \     \  |
+		 *    11    8 5
+		 *     \     \|
+		 *      *--7--* 
+		 */
+		
+		if(cubeAxes.size() == 0)
+			initializeCubeNormalsArray(cubeAxes);
+		
+		//Generate Normals For Faces (there are duplicate normals, so we can save time by only generating half, there are 3 faces)
+		//object 1 face normals
+		calculateFaceNorm(cubeAxes.get(0), segmentsObj1.get(0), segmentsObj1.get(1)); //front face; rear face is duplicate
+		calculateFaceNorm(cubeAxes.get(1), segmentsObj1.get(0), segmentsObj1.get(9)); //side face; there also exists duplicate
+		calculateFaceNorm(cubeAxes.get(2), segmentsObj1.get(1), segmentsObj1.get(9)); //top face; also exists duplicate beneath
+		//Object 2 face normals
+		calculateFaceNorm(cubeAxes.get(3), segmentsObj2.get(0), segmentsObj2.get(1)); //front face; rear face is duplicate
+		calculateFaceNorm(cubeAxes.get(4), segmentsObj2.get(0), segmentsObj2.get(9)); //side face; there also exists duplicate
+		calculateFaceNorm(cubeAxes.get(5), segmentsObj2.get(1), segmentsObj2.get(9)); //top face; also exists duplicate beneath
+		
+		
+		//3d requires something a bit more than 2d; we must check if our edges are overlapping, otherwise we may get false positives.
+		//Imagine a cubeA setting on a table; imagine cube B leaning onto cubeA so that a edge on the top face of B is setting on a vertical edge of A.
+		//We can imaging the two cubes as not quite having collided yet. So, we know the cubes are not colliding (there is some fraction of air between them)
+		//However, projecting onto the normal vectors of the faces show overlap for every face.
+		//We know the cubes are no colliding, so what axis are we forgetting to project onto?
+		//Image that we place a sheet of paper between the two cubes. 
+		//Drawing a line out of the normal of this paper will be our axis.
+		//By projecting onto this axis, nether cube is having an overlap!
+		//To calculate a vector in the plane, we simply need:
+		//1)the vectors representing the edge of the cubes, -- we can say these vectors are in the plane of the paper between the cubes
+		//2)the resulting vector of the cross product of the two vectors (ie the edges) in the plane; this will be our normal vector and our axis. 
+		
+		//Since we have parallel edges, there is some redundancy we can remove.
+		//Where C represents cube, and E represents edge...
+		//We can achieve all axes from: C1E1 X C2E1; C1E1 X C2E2; C1E1 X C2E3; C1E2 X C2E1;C1E2 X C2E2;C1E2 X C2E3;C1E2 X C2E1; C1E3 X C2E2;C1E3 X C2E3
+		//edges 0, 1, and 9 our are non-redundant edges
+		calculateEdgeAxis(cubeAxes.get(6), segmentsObj1.get(0), segmentsObj2.get(0));
+		calculateEdgeAxis(cubeAxes.get(7), segmentsObj1.get(0), segmentsObj2.get(1));
+		calculateEdgeAxis(cubeAxes.get(8), segmentsObj1.get(0), segmentsObj2.get(9));
+		calculateEdgeAxis(cubeAxes.get(9), segmentsObj1.get(1), segmentsObj2.get(0));
+		calculateEdgeAxis(cubeAxes.get(10), segmentsObj1.get(1), segmentsObj2.get(1));
+		calculateEdgeAxis(cubeAxes.get(11), segmentsObj1.get(1), segmentsObj2.get(9));
+		calculateEdgeAxis(cubeAxes.get(12), segmentsObj1.get(9), segmentsObj2.get(0));
+		calculateEdgeAxis(cubeAxes.get(13), segmentsObj1.get(9), segmentsObj2.get(1));
+		calculateEdgeAxis(cubeAxes.get(14), segmentsObj1.get(9), segmentsObj2.get(9));
+	}
+	
+	private static void calculateEdgeAxis(Vector3 axisVector, Segment3D obj1Edge, Segment3D obj2Edge)
+	{
+		//Take differences of vertices in cube to get vector that represents the edge
+		temp1.set(obj1Edge.firstVert);
+		temp1.sub(obj1Edge.secondVert);
+		temp2.set(obj2Edge.firstVert);
+		temp2.sub(obj2Edge.secondVert);
+		
+		//The two edges define a plane between them
+		//we want the normal to this plane, it is an axis we must project on. 
+		Vector3 edge1 = temp1; //renaming for clarity 
+		Vector3 edge2 = temp2;
+		axisVector.set(edge1);
+		axisVector.crs(edge2);
+	}
+
+	private static void calculateFaceNorm(Vector3 faceNormal, Segment3D faceEdge1, Segment3D faceEdge2)
+	{
+		//take difference of two vectors in a segment to get a vector that is in the plane.
+		temp1.set(faceEdge1.firstVert);
+		temp1.sub(faceEdge1.secondVert);
+		
+		//take difference of two vectors in a segment to get a vector that is in the plane.
+		temp2.set(faceEdge2.firstVert);
+		temp2.sub(faceEdge2.secondVert);
+		
+		//take the cross product between two vectors in the face plane to the a vector in the normal direction; this is our axis. 
+		Vector3 faceVector1 = temp1; //renaming for clarity
+		Vector3 faceVector2 = temp2;
+		faceNormal.set(faceVector1);
+		faceNormal.crs(faceVector2);
+	}
+
+	private static void initializeCubeNormalsArray(ArrayList<Vector3> cubeAxes)
+	{
+		cubeAxes.clear();
+		for(int i = 0; i < 15; ++i)
 		{
-			Segment3D segment = segments.get(i);
-
-			// take the vector difference to derive the vector within the plane (i.e. the line since
-			// we're in 2D).
-			float planeX = segment.secondVertX - segment.firstVertX;
-			float planeY = segment.secondVertY - segment.firstVertY;
-
-			// (normal) dot (plane) = 0
-			// normalX(planeX) + normalY(planeY) = 0
-			// for every unknown except 1, assign a value
-
-			// ALGEBRA
-			// normalX = 1
-			// 1*(planeX) + normalY*(planeY) = 0
-			// normalY*planeY = -(1 * planeX)
-			// normalY = -(1 * planeX) / planeY //adjust for zero division, both cannot be 0; choose
-			// to divide by that which is not 0
-
-			float arbitraryValue = 1;
-			float normalX, normalY = 0;
-			if (planeY != 0)
-			{
-				normalX = arbitraryValue;
-				normalY = -(normalX * planeX) / planeY;
-			}
-			else
-			{
-				normalY = arbitraryValue;
-				normalX = -(normalY * planeY) / planeX;
-			}
-			segment.firstVertX = segment.secondVertX = normalX;
-			segment.firstVertY = segment.secondVertY = normalY;
+			cubeAxes.add(new Vector3());
 		}
+		
 	}
 
 	/* ------------------------------- HELPER CLASSES ----------------------------- */
@@ -453,29 +466,5 @@ public class SAT3D
 
 		public Vector3 firstVert = new Vector3();
 		public Vector3 secondVert = new Vector3();
-	}
-
-	/**
-	 * Structure that contains all information needed for debug rendering.
-	 * 
-	 * @author matt
-	 */
-	public static class RenderInformation2D
-	{
-		public RenderInformation2D(ShapeRenderer sr)
-		{
-			this.shapeRenderer = sr;
-			obj1Center = new Vector2();
-			obj2Center = new Vector2();
-		}
-
-		public ShapeRenderer shapeRenderer;
-		public Vector2 obj1Center;
-		public Vector2 obj2Center;
-		public Color defaultColor = new Color(Color.WHITE);
-		public Color obj1Color = new Color(Color.GREEN);
-		public Color obj2Color = new Color(Color.BLUE);
-		public Color axisColorObj1 = new Color(209 / 255f, 255 / 255f, 198 / 255f, 1f);
-		public Color axisColorObj2 = new Color(Color.SKY);
 	}
 }

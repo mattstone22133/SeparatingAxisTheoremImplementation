@@ -1,7 +1,5 @@
 package sat.simulation;
 
-import java.nio.FloatBuffer;
-
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
@@ -9,19 +7,13 @@ import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.PerspectiveCamera;
-import com.badlogic.gdx.graphics.VertexAttributes;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g3d.Environment;
-import com.badlogic.gdx.graphics.g3d.Material;
-import com.badlogic.gdx.graphics.g3d.Model;
 import com.badlogic.gdx.graphics.g3d.ModelBatch;
-import com.badlogic.gdx.graphics.g3d.ModelInstance;
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute;
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight;
 import com.badlogic.gdx.graphics.g3d.utils.FirstPersonCameraController;
-import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 
 import sat.simulation.WrappedCubeModel.CubeInstance;
@@ -30,9 +22,6 @@ public class Application3D extends ApplicationAdapter implements InputProcessor
 {
 	// 3D classes provided with Libgdx framework
 	private ModelBatch modelBatch;
-	private ModelBuilder modelBuilder;
-	private Model cubeGreenArchType;
-	private ModelInstance cube;
 	private Environment environment;
 	private DirectionalLight mainLight;
 	private PerspectiveCamera camera;
@@ -42,17 +31,13 @@ public class Application3D extends ApplicationAdapter implements InputProcessor
 	private BitmapFont bmFont;
 	private SpriteBatch spriteBatch;
 
-	// logic
-	private float translationSpeed = 5f;
-	private float rotationSpeed = 5f;
-
 	private boolean collisionLibraryDetected;
 	private boolean collisionSATDetected;
 
-	private SAT.RenderInformation2D renderInfo;
 	private boolean useMTV = false;
-	private Vector2 mtv = new Vector2();
+	private Vector3 mtv = new Vector3();
 	private CubeInstance cubeBlue;
+	private CubeInstance cubeGreen;
 
 	@Override
 	public void create()
@@ -73,7 +58,6 @@ public class Application3D extends ApplicationAdapter implements InputProcessor
 		environment.add(mainLight);
 
 		modelBatch = new ModelBatch();
-		modelBuilder = new ModelBuilder();
 
 		float cubeWidth = 3, cubeHeight = 3, cubeDepth = 3;
 		// cubeGreenArchType = modelBuilder.createBox(cubeWidth, cubeHeight, cubeDepth,
@@ -131,20 +115,19 @@ public class Application3D extends ApplicationAdapter implements InputProcessor
 		}
 		if (collisionSATDetected)
 		{
-			// bmFont.draw(batch, "SAT detected collision", Gdx.graphics.getWidth() / 2 - 10f, 0 + 2
-			// * bmFont.getCapHeight());
+			 bmFont.draw(spriteBatch, "SAT detected collision", Gdx.graphics.getWidth() / 2 - 10f, 0 + 2
+			 * bmFont.getCapHeight());
 		}
 		else
 		{
-			// bmFont.draw(batch, "No detected collisions", Gdx.graphics.getWidth() / 2
-			// - bmFont.getSpaceWidth() * "No detected collisions".length() //approximately center
-			// this text
-			// ,0 + 2 * bmFont.getCapHeight());
+			 bmFont.draw(spriteBatch, "No detected collisions", Gdx.graphics.getWidth() / 2
+					 - bmFont.getSpaceWidth() * "No detected collisions".length() //approximately center this text
+					 ,0 + 2 * bmFont.getCapHeight());
 		}
 		if (useMTV)
 		{
-			// bmFont.draw(batch, "MTV enabled", Gdx.graphics.getWidth() * 0.45f,
-			// Gdx.graphics.getHeight() * 0.80f);
+			 bmFont.draw(spriteBatch, "MTV enabled", Gdx.graphics.getWidth() * 0.45f,
+			 Gdx.graphics.getHeight() * 0.80f);
 		}
 
 		spriteBatch.end();
@@ -152,31 +135,21 @@ public class Application3D extends ApplicationAdapter implements InputProcessor
 
 	private void calculateCollisions()
 	{
-		// check collision via library methods
+		// check collision via library methods (not sure if there is a library method for 3d
 		// collisionLibraryDetected = Intersector.overlapConvexPolygons(square, triangle);
 
-		if (!useMTV)
+		collisionSATDetected = SAT3D.CubeCollide_3D_mtv(cubeGreen.getTransformVertices(), cubeBlue.getTransformVertices(), mtv);
+		if (useMTV && collisionSATDetected)
 		{
-			// collisionSATDetected = SAT.PolygonCollide_2D_v1(renderInfo,
-			// square.getTransformedVertices(), triangle.getTransformedVertices());
-		}
-		else
-		{
-			// collisionSATDetected = SAT.PolygonCollide_2D_mtv(renderInfo,
-			// square.getTransformedVertices(), triangle.getTransformedVertices(), mtv);
-			if (collisionSATDetected)
-			{
-				// square.translate(mtv.x, mtv.y);
-			}
+			cubeGreen.model().transform.translate(mtv);
 		}
 	}
 
-	private static Vector3 rotatePnt = new Vector3(0f, 0f, 0f);
+	//private static Vector3 rotatePnt = new Vector3(0f, 0f, 0f);
 	private static Vector3 xAxis = new Vector3(1f, 0f, 0f);
 	private static Vector3 yAxis = new Vector3(0f, 1f, 0f);
-	private static Vector3 zAxis = new Vector3(0f, 0f, 1f);
-	private static float rotationDegrees = 1f;
-	private CubeInstance cubeGreen;
+	//private static Vector3 zAxis = new Vector3(0f, 0f, 1f);
+	//private static float rotationDegrees = 1f;
 
 	private void keyboard_IO()
 	{
