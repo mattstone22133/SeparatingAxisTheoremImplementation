@@ -6,6 +6,7 @@ import com.badlogic.gdx.Input;
 
 public class SATMain extends ApplicationAdapter
 {
+	private Application2DPresentation presentation;
 	private Application2D application2D;
 	private Application3D application3D;
 	private ApplicationAdapter current;
@@ -19,7 +20,10 @@ public class SATMain extends ApplicationAdapter
 		application3D = new Application3D();
 		application3D.create();
 		
-		current = application2D;
+		presentation = new Application2DPresentation();
+		presentation.create();
+		
+		current = presentation;
 	}
 
 	@Override
@@ -29,7 +33,8 @@ public class SATMain extends ApplicationAdapter
 		
 		if(Gdx.input.isKeyJustPressed(Input.Keys.NUM_1))
 		{
-			current = application2D;
+			//current = application2D;
+			current = presentation;
 		}
 		if(Gdx.input.isKeyJustPressed(Input.Keys.NUM_2))
 		{
@@ -42,5 +47,6 @@ public class SATMain extends ApplicationAdapter
 	{
 		application2D.dispose();
 		application3D.dispose();
+		presentation.dispose();
 	}
 }
