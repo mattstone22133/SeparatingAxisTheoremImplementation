@@ -40,6 +40,10 @@ public class SATMain extends ApplicationAdapter
 		{
 			current = application3D;
 		}
+		if(Gdx.input.isKeyJustPressed(Input.Keys.NUM_3))
+		{
+			current = application2D;
+		}
 	}
 
 	@Override
