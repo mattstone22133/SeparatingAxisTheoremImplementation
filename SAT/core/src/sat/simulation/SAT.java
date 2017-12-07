@@ -189,15 +189,22 @@ public class SAT
 			// The base of the triangle (ie the axis) and the height (ie the base -
 			// projected_vector) are orthogonal to each other, this means their dot is 0.
 			// However, we don't know the height of the triangle. But it can be said to be the
-			// vector difference of the projection vector with the axis vector.
+			// vector difference of the projectioned vector with the axis vector.
 			// ie projectionVector - axis vector.
 			// We derive the following equation: (projected - c*v) DOT (V) = 0 -- where projected is
 			// the projected vector, c*v is the axis, and v is the vector defining the axis
 			// The following is an algebraic manipulation for solving for C.
-			// (projectedVect -c*v) DOT (V) = 0
-			// (projectedVect DOT V) - (c*V DOT V) = 0
-			// (projectedVect DOT V) = -(c*V DOT V)
-			// (projectedVect DOT V) / (V DOT V) = C
+			//
+			// c*v = projection
+			// shadowCastingVector -c*v // vector in direction of tip of shadowCastingVector from the projection
+			// v = vector defining the axis. 
+			//
+			// (shadowCastingVector -c*v) DOT (V) = 0
+			// (shadowCastingVector DOT V) - (c*V DOT V) = 0
+			// (shadowCastingVector DOT V) = -(c*V DOT V)
+			// (shadowCastingVector DOT V) / (V DOT V) = C
+			//
+			//
 			float C = dot2D(obj1Vertices[i], obj1Vertices[i + 1], axis.firstVertX, axis.firstVertY) / vDotV;
 
 			// float projX = 0, projY = 0;
