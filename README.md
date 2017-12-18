@@ -1,1 +1,1 @@
-# SeparatingAxisTheormImplementation
+# SeparatingAxisTheoremImplementation
