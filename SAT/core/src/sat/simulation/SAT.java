@@ -12,11 +12,6 @@ import com.badlogic.gdx.math.Vector2;
  * Class responsible for Separating Axis Theorem calculations.
  * 
  * @author Matt Stone
- * @author Brenner Harris
- *
- */
-/**
- * @author matt
  *
  */
 public class SAT
